@@ -33,7 +33,11 @@ Les données utilisées dans cette analyse sont **des données simulées**, gén
 - Très faible variabilité inter-blocs (Variance = 0,0068)
 
 ---
+## 📊 Visualisation
 
+![Effet des doses d'azote sur le rendement](figures/rendement_dose_azote.png)
+
+---
 ## 🛠️ Outils et Technologies
 
 - **Logiciel** : R & RStudio
@@ -57,7 +61,7 @@ essai-fertilisation-mais/
 └── figures/
     └── rendement_dose_azote.png
 
-
+---
 ## 👨‍🎓 Author
 
 **AGBO K. Doris**  
