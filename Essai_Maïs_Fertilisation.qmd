@@ -1,0 +1,185 @@
+---
+title: "Analyse d'un essai de fertilisation azotée sur maïs"
+subtitle: "Étude en blocs aléatoires complets"
+author: "AGBO K. Doris"
+date: "`r Sys.Date()`"
+format: html
+editor: visual
+execute: 
+  message: false
+  warning: false
+---
+
+## Introduction
+
+L’azote constitue l’élément le plus limitant pour la production du maïs dans de nombreuses régions. Une fertilisation rationnelle est donc indispensable pour optimiser le rendement tout en minimisant les impacts environnementaux.
+
+La présente étude vise à analyser l’effet de six doses d’azote (0 à 150 kg N/ha) sur le rendement et les composantes agronomiques du maïs dans un dispositif en blocs aléatoires complets. À travers une approche statistique basée sur les modèles linéaires mixtes et des comparaisons multiples, ce travail permet d’identifier la dose optimale et d’évaluer l’efficacité agronomique de la fertilisation azotée.
+
+## 1. Matériel et Méthodes
+
+### 1.1. Dispositif expérimental
+
+L’étude a été réalisée selon un dispositif expérimental en **Blocs Aléatoires Complets (BAC)** comportant **4 blocs** (répétitions).
+
+Le facteur étudié est la **dose d’azote**, avec **six niveaux** : 0, 30, 60, 90, 120 et 150 kg N/ha. Chaque combinaison Bloc × Dose a été appliquée sur une parcelle élémentaire. Les autres éléments fertilisants (phosphore, potassium) ont été apportés uniformément sur l’ensemble de l’essai selon les recommandations agronomiques.
+
+*Les données analysées sont issues d’un **jeu de données simulé**, conçu pour illustrer l’analyse statistique d’un essai agronomique en blocs aléatoires complets.*
+
+### 1.2. Outils statistiques
+
+Les données ont été analysées à l’aide du logiciel **R** (version 4.5.3).
+
+**Packages utilisés :**
+
+-   tidyverse : manipulation et visualisation des données
+
+-   lme4 : ajustement des modèles linéaires mixtes
+
+-   emmeans : estimations marginales et comparaisons multiples
+
+-   ggplot2 : création des graphiques
+
+**Modèle statistique :** Un **modèle linéaire mixte** a été utilisé :​
+
+![](images/clipboard-1343768111.png)
+
+Les comparaisons multiples entre les doses ont été réalisées à l’aide de la méthode de Tukey (ajustement sur les moyennes marginales estimées).
+
+## 2. Résultats
+
+### 2.1. Analyse exploratoire
+
+```{r}
+#Nettoyage
+rm(list=ls())
+```
+
+```{r}
+#Packages
+library(tidyverse)
+library(psych)
+library(lme4)
+library(emmeans)
+```
+
+```{r}
+#Importation & Transformation
+df <- read.csv("essai_maïs_fertilisation.csv")
+
+df <- df%>%
+  mutate(
+    Dose_N=factor(Dose_N),
+    Bloc=factor(Bloc),
+)
+
+str(df)
+
+```
+
+```{r}
+#Analyse descriptive
+desc <- describe(df)
+desc <- desc %>%
+  mutate(CV = (sd / mean) * 100)
+print(round(desc, 2))
+
+```
+
+```{r}
+#Visualisation
+pairs(df[,c("Rendement","Dose_N","Hauteur","Nb_epis")],main="Pairs plot",
+      pch = 21,bg=c("red","blue","gray","green3","orange","brown")[unclass(df$Dose_N)])
+```
+
+### 2.2. Analyse de variance (Modèle mixte) & Diagnostics
+
+```{r}
+# Modélisation
+model <- lmer(Rendement~Dose_N+(1|Bloc),data=df)
+summary(model)
+```
+
+```{r}
+#Vérification des hypothèses
+
+# Extraction des résidus et valeurs prédites
+residus <- residuals(model)
+fitted  <- fitted(model)
+
+# Configuration des graphiques (2 lignes, 2 colonnes)
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+
+
+# a. Homoscédasticité : Résidus vs Valeurs prédites
+plot(fitted, residus, 
+     main = "a. Homoscédasticité",
+     xlab = "Valeurs prédites", 
+     ylab = "Résidus")
+abline(h = 0, col = "red", lty = 2)
+
+# b. QQ-plot pour la normalité
+qqnorm(residus, main = "b. Normalité des résidus")
+qqline(residus, col = "red")
+
+
+# c. Histogramme des résidus
+hist(residus, main = "c. Histogramme des résidus", 
+     xlab = "Résidus", col = "lightblue", border = "black")
+
+# d. Résidus par Dose d'azote
+boxplot(residus ~ Dose_N, data = df, 
+        main = "d. Résidus par Dose",
+        xlab = "Dose d'azote (kg N/ha)", 
+        ylab = "Résidus")
+abline(h = 0, col = "red", lty = 2)
+```
+
+### 2.3. Comparaisons multiples et lettres de groupes
+
+```{r}
+
+emm <- emmeans(model, pairwise ~ Dose_N, adjust = "tukey")
+
+cld <- multcomp::cld(emm$emmeans, Letters = letters, adjust = "tukey")
+cld_df <- as.data.frame(cld)
+cld_df
+```
+
+### 2.4. Visualisation des résultats
+
+```{r}
+ggplot(cld_df, aes(x = Dose_N, y = emmean, fill = Dose_N)) +
+  geom_bar(stat = "identity", color = "black", width = 0.75) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.3, size = 0.8) +
+  geom_text(aes(label = .group), vjust = -0.5, size = 4.5, fontface = "bold") +
+  scale_fill_manual(values = c("red","blue","gray","green3","orange","brown")) +
+  labs(title = "Effet de la dose d'azote sur le rendement du maïs",
+       subtitle = "Moyennes ajustées avec lettres de groupes (Tukey, α=0.05)",
+       x = "Dose d'azote (kg N/ha)",
+       y = "Rendement (t/ha)") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.title = element_text(face = "bold", size = 14),
+        axis.text = element_text(size = 11))
+
+ggsave("rendement_dose_azote.png", width = 8, height = 6, dpi = 300)
+```
+
+## 3. Discussion
+
+L’analyse statistique met en évidence un effet hautement significatif de la dose d’azote sur le rendement du maïs. Le rendement progresse fortement avec l’augmentation de la dose, passant de 4,90 t/ha au témoin (0 kg N/ha) à 9,10 t/ha à 120 kg N/ha, soit un gain de plus de 85 %.
+
+Cette réponse typique en courbe de Mitscherlich indique l’existence d’un optimum agronomique autour de 120 kg N/ha. Les comparaisons multiples (Tukey) confirment que la dose de 120 kg N/ha est significativement supérieure aux autres doses et constitue l’optimum agronomique dans les conditions de cet essai. A150 kg N/ha, le rendement diminue légèrement (8,60 t/ha), indiquant une perte d’efficience de l’azote à forte dose.
+
+La très faible variance inter-blocs (0,0068) reflète une bonne homogénéité de l’essai, renforçant ainsi la fiabilité des conclusions.
+
+Ces résultats soulignent l’importance d’une fertilisation azotée raisonnée. en d'autre terme une sous-fertilisation limite considérablement le potentiel productif, tandis qu’une sur-fertilisation n’apporte aucun avantage supplémentaire et peut même s’avérer contre-productive.
+
+## 4. Conclusion
+
+Cette étude a démontré un effet significatif et marqué des doses d’azote sur le rendement du maïs. Grâce à un modèle linéaire mixte et à des comparaisons multiples, la dose optimale a été clairement identifiée à 120 kg N/ha, permettant d’atteindre un rendement moyen de 9,10 t/ha.
+
+Les résultats, qui suivent une courbe de Mitscherlich typique, confirment la nécessité d’optimiser la fertilisation azotée pour maximiser la productivité tout en limitant les apports excessifs.
+
+Ce travail illustre l’intérêt des modèles linéaires mixtes pour l’analyse des essais agronomiques et fournit une base concrète pour des recommandations techniques adaptées.
